@@ -19,11 +19,9 @@ class Card {
   }
   
   boolean isOver() {
-    if(mouseX == 0 || mouseY == 0) return false;
-    
     boolean isInHoriz = mouseX >= x && mouseX <= x+w;
     boolean isInVert = mouseY >= y && mouseY <= y+h;
-  
+    
     return isInHoriz && isInVert;
   }
 }

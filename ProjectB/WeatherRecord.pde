@@ -10,10 +10,6 @@ class WeatherRecord {
     this.precip = precip;
   }
 
-  int getYear() {
-    return int(split(date, '-')[0]);
-  }
-  
   int getMonth() {
     return int(split(date, '-')[1]);
   }

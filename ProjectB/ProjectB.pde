@@ -1,19 +1,14 @@
 Table table;
-int rowCount;
+PFont font;
+String[] months;
+int rowCount, minYear, maxYear, currYear, legendTop, detailsTop;
 ArrayList<Card> cards = new ArrayList<Card>();
-static int infoPanelHeight = 352;
-int squareSize = 32;
 color cold = #00a8ff;
 color hot = #f8410a;
-int minYear;
-int maxYear;
-int currYear;
-static float yearMinTemp = MAX_FLOAT;
-static float yearMaxTemp = MIN_FLOAT;
-int legendTop;
-int detailsTop;
-String[] months;
-PFont font;
+int infoPanelHeight = 352;
+int squareSize = 32;
+float yearMinTemp = MAX_FLOAT;
+float yearMaxTemp = MIN_FLOAT;
 
 void setup() {
   size(1024, 768);
@@ -31,18 +26,20 @@ void setup() {
   createAxes();
   createLegend();
   
-  mouseX = squareSize;  //set initial hover to update info panel
+  mouseX = squareSize;  //set initial hover to 1st day
   mouseY = squareSize;
-  mouseClicked();
 }
 
 void draw() {
   for(Card card : cards) {
     if(card.isOver()) {
-      drawInfoPanel(card);  // update info panel background and data
-      
-      // update legend and pointer
+      drawInfoPanel(card);
       createLegend();
+      
+      // if missing avg temp for day, just return
+      if (Float.isNaN(card.record.avgTemp)) return;
+      
+      // redraw pointer
       fill(255);
       float pos = map(card.record.avgTemp, yearMinTemp, yearMaxTemp, squareSize, width);
       triangle(constrain(pos-5, squareSize, width), detailsTop, pos, legendTop+25, pos+5, detailsTop);
@@ -61,18 +58,21 @@ void keyPressed() {
 }
 
 void importData() {
-  table = loadTable("weather.csv", "header");  // import data table
+  // import data table
+  table = loadTable("weather.csv", "header");  
   rowCount = table.getRowCount();
 
-  StringList dateStrings = table.getStringList("DATE");
+  // get all dates from dataset
+  StringList dateStrings = table.getStringList("DATE"); 
   IntList years = new IntList();
   
-  // get years from dataset to determin min max bounds for arrow keys
+  // store dates in array so we can pick min/max
   for(String d : dateStrings) {
     String year = split(d, '-')[0];
     years.append(int(year)); 
   }
   
+  // set min max year bounds for arrow keys
   minYear = years.min();
   maxYear = years.max();
 }
@@ -87,41 +87,55 @@ ArrayList<TableRow> getRowsForYear(int year) {
     }
   }
 
+  // return array with only records for year 
   return results;
 }
 
 void displayCards(int year) {
+  // track year being displayed globally
   currYear = year;
+  
+  // reset min/max temps to values that will be replaced
   yearMinTemp = MAX_FLOAT;
   yearMaxTemp = MIN_FLOAT;
+  
+  // get only records for year
   ArrayList<TableRow> rfy = getRowsForYear(year);
   ArrayList<WeatherRecord> records = new ArrayList<WeatherRecord>();
   
+  // set title bar
   surface.setTitle("Nashville Weather " + nf(currYear));
   
   for(TableRow row : rfy) {
+    // pluck properties we care about for a WeatherRecord
     String dateStr = row.getString("DATE");
     float avgTemp = row.getFloat("TAVG");
     float minTemp = row.getFloat("TMIN");
     float maxTemp = row.getFloat("TMAX");
     float precip = row.getFloat("PRCP");
     
+    // update global min/max avg temps
     yearMinTemp = min(avgTemp, yearMinTemp);
     yearMaxTemp = max(avgTemp, yearMaxTemp);
     
+    // add our new record to the array
     records.add(new WeatherRecord(dateStr, avgTemp, minTemp, maxTemp, precip));
   }
 
+  // reset the card display area
   cards.clear();
-  
   fill(0);
   rect(squareSize, squareSize, width-squareSize, legendTop);
   
+  // iterate over records and create a new card to hold each one
   for(int i = 0; i < records.size(); i++) {
     WeatherRecord record = records.get(i);
+    // map current record avg temp to min/max avg temp range
     color k = lerpColor(cold, hot, norm(record.avgTemp, yearMinTemp, yearMaxTemp));
     Card c = new Card(squareSize*record.getDay(), squareSize*record.getMonth(), squareSize, squareSize, k, record);
+    // add new card to array
     cards.add(c);
+    // show the card
     c.display();
   }
 }
@@ -133,12 +147,14 @@ void createAxes() {
   textAlign(CENTER);
   int currDay = 1;
   for(int x = squareSize; x < width; x+=squareSize) {
+    // write day of month numbers
     text(nf(currDay), x+15, 20);
     currDay++;
   }
   
   int currMonth = 0;
   for(int y = squareSize; y < legendTop; y+=squareSize) {
+    // write month abbreviations
     text(months[currMonth], 15, y+20);
     currMonth++;
   }
@@ -148,7 +164,7 @@ void createLegend() {
   int x = squareSize;
   int y = legendTop;
   
-  // draw gradient
+  // draw gradient from cold to hot
   color curr = cold;
   float pos = 0;
   for(int i = x; i < width; ++i) {
@@ -158,7 +174,7 @@ void createLegend() {
     line(i, y, i, y+squareSize);
   }
   
-  // draw legend min/max
+  // write legend min/max
   textSize(16);
   fill(255);
   textAlign(LEFT, TOP);
@@ -176,9 +192,12 @@ void createLegend() {
 
 void drawInfoPanel(Card card) {
   rectMode(CORNER);
+  // grab record off of card that was passed in
   WeatherRecord record = card.record;
+  // set fill to card color
   fill(card.c);
   rect(squareSize, detailsTop+1, width, infoPanelHeight-1);
+  // write record details to info panel area
   fill(255);
   textAlign(CENTER, TOP);
   textSize(180);
